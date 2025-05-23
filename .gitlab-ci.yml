@@ -1,0 +1,31 @@
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  image: node:18
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+
+deploy_to_openshift:
+  stage: deploy
+  image: registry.access.redhat.com/openshift-cli:latest
+  script:
+    - oc login --token=$OPENSHIFT_TOKEN --server=$OPENSHIFT_SERVER --insecure-skip-tls-verify
+    - oc project $OPENSHIFT_NAMESPACE
+    - |
+      if oc get deployment goal-tracker &>/dev/null; then
+        echo "Updating existing deployment"
+        oc set image deployment/goal-tracker goal-tracker=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+      else
+        echo "Creating new deployment"
+        oc new-app --name=goal-tracker --docker-image=$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+        oc expose service/goal-tracker
+      fi
+  only:
+    - main
