@@ -4,6 +4,7 @@ import Home from "./components/home";
 import OnboardingFlow from "./components/Onboarding/OnboardingFlow";
 import { AuthProvider } from "./lib/auth";
 import { GoalProvider } from "./lib/contexts/GoalContext";
+import { Toaster } from "./components/ui/toaster";
 import routes from "tempo-routes";
 
 // Lazy load components for better performance
@@ -31,6 +32,14 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<LoginForm />} />
               <Route path="/signup" element={<SignupForm />} />
+              <Route
+                path="/reset-password"
+                element={
+                  <div className="flex items-center justify-center min-h-screen bg-background p-4">
+                    <LoginForm />
+                  </div>
+                }
+              />
               <Route path="/onboarding" element={<OnboardingFlow />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/goals" element={<DashboardPage />} />
@@ -46,6 +55,7 @@ function App() {
             {/* Tempo routes should be before the Routes component */}
           </>
         </Suspense>
+        <Toaster />
       </GoalProvider>
     </AuthProvider>
   );

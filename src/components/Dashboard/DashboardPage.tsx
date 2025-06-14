@@ -22,6 +22,7 @@ const DashboardLayout = DashboardLayoutImport || FallbackLayout;
 import TaskList from "@/components/Dashboard/TaskList";
 import ProgressTracker from "@/components/Dashboard/ProgressTracker";
 import GoalHierarchy from "@/components/Dashboard/GoalHierarchy";
+import AIAgentPanel from "@/components/Dashboard/AIAgentPanel";
 import { useAuth } from "@/lib/auth";
 import { useGoals } from "@/lib/contexts/GoalContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -37,7 +38,12 @@ const DashboardPage = () => {
     if (!user && !authLoading) {
       navigate("/login");
     }
-  }, [user, authLoading, navigate]);
+
+    // If we have a user, refresh the data
+    if (user && !authLoading && refreshData) {
+      refreshData();
+    }
+  }, [user, authLoading, navigate, refreshData]);
 
   // If auth is still loading, show loading state
   if (authLoading) {
@@ -58,7 +64,7 @@ const DashboardPage = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             Welcome back{user?.email ? `, ${user.email.split("@")[0]}` : ""}!
           </h1>
         </div>
@@ -77,17 +83,18 @@ const DashboardPage = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
                 <GoalHierarchy />
+                <ProgressTracker />
               </div>
-              <div>
+              <div className="space-y-6">
                 <TaskList />
+                {/* New AI Agent Panel */}
+                <div className="mt-6">
+                  <AIAgentPanel />
+                </div>
               </div>
-            </div>
-
-            <div>
-              <ProgressTracker />
             </div>
           </>
         )}

@@ -37,7 +37,13 @@ const Home = () => {
   }, []);
 
   const handleGetStarted = () => {
-    navigate("/onboarding");
+    // Check if user is logged in using localStorage
+    const isLoggedIn = localStorage.getItem("supabase.auth.token") !== null;
+    if (isLoggedIn) {
+      navigate("/dashboard");
+    } else {
+      navigate("/login");
+    }
   };
 
   const features = [
@@ -92,14 +98,24 @@ const Home = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <Button
-                size="lg"
-                onClick={handleGetStarted}
-                className="mt-6 px-8"
-              >
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  size="lg"
+                  onClick={handleGetStarted}
+                  className="mt-6 px-8"
+                >
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate("/login")}
+                  className="mt-6 px-8"
+                >
+                  Sign In
+                </Button>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -155,10 +171,24 @@ const Home = () => {
                 personalized goal tracking system.
               </p>
             </div>
-            <Button size="lg" onClick={handleGetStarted} className="mt-4 px-8">
-              Begin Your Journey
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-4 justify-center">
+              <Button
+                size="lg"
+                onClick={handleGetStarted}
+                className="mt-4 px-8"
+              >
+                Begin Your Journey
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/signup")}
+                className="mt-4 px-8"
+              >
+                Create Account
+              </Button>
+            </div>
           </div>
         </div>
       </section>

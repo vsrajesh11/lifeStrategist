@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +17,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronRight, ChevronLeft, Check } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 interface OnboardingFlowProps {
   onComplete?: (userData: any) => void;
@@ -27,7 +31,11 @@ const OnboardingFlow = ({
   onComplete = () => {},
   isOpen = true,
 }: OnboardingFlowProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [userData, setUserData] = useState({
     personality: {
       traits: [],
@@ -64,13 +72,152 @@ const OnboardingFlow = ({
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
+      saveUserData();
+    }
+  };
+
+  const saveUserData = async () => {
+    if (!user) {
+      toast({
+        title: "Not logged in",
+        description: "Please log in to save your preferences",
+        variant: "destructive",
+      });
+      navigate("/login");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Save user preferences to Supabase
+      const { data, error } = await supabase
+        .from("user_preferences")
+        .upsert({
+          user_id: user.id,
+          personality: userData.personality,
+          preferences: userData.preferences,
+          goals: userData.goals,
+          motivators: userData.motivators,
+          updated_at: new Date().toISOString(),
+        })
+        .select();
+
+      if (error) throw error;
+
+      // Also create initial goals based on the user's input
+      await createInitialGoals();
+
+      toast({
+        title: "Preferences saved",
+        description: "Your goal journey has been saved successfully",
+      });
+
+      // Store in local storage that onboarding is complete
+      localStorage.setItem("hasCompletedOnboarding", "true");
+
+      // Call the onComplete callback
       onComplete(userData);
+
+      // Navigate to dashboard
+      navigate("/dashboard");
+    } catch (err: any) {
+      console.error("Error saving preferences:", err);
+      toast({
+        title: "Error saving preferences",
+        description: err.message || "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const createInitialGoals = async () => {
+    if (!user) return;
+
+    try {
+      console.log("Creating initial goals for user:", user.id);
+      console.log("User data goals:", userData.goals);
+
+      // Create lifetime goals
+      for (const goalTitle of userData.goals.lifetime) {
+        console.log("Creating lifetime goal:", goalTitle);
+        const { data, error } = await supabase
+          .from("goals")
+          .insert({
+            title: goalTitle,
+            description: "",
+            priority: "high",
+            progress: 0,
+            impact: 80,
+            type: "lifetime",
+            user_id: user.id,
+          })
+          .select();
+
+        if (error) {
+          console.error("Error creating lifetime goal:", error);
+        } else {
+          console.log("Created lifetime goal:", data);
+        }
+      }
+
+      // Create medium-term goals
+      for (const goalTitle of userData.goals.mediumTerm) {
+        console.log("Creating medium-term goal:", goalTitle);
+        const { data, error } = await supabase
+          .from("goals")
+          .insert({
+            title: goalTitle,
+            description: "",
+            priority: "medium",
+            progress: 0,
+            impact: 60,
+            type: "medium-term",
+            user_id: user.id,
+          })
+          .select();
+
+        if (error) {
+          console.error("Error creating medium-term goal:", error);
+        } else {
+          console.log("Created medium-term goal:", data);
+        }
+      }
+
+      // Create immediate goals/tasks
+      for (const taskTitle of userData.goals.immediate) {
+        console.log("Creating task:", taskTitle);
+        const { data, error } = await supabase
+          .from("tasks")
+          .insert({
+            title: taskTitle,
+            description: "",
+            estimated_time: 30,
+            impact_score: 50,
+            priority: "medium",
+            completed: false,
+            in_progress: false,
+            user_id: user.id,
+          })
+          .select();
+
+        if (error) {
+          console.error("Error creating task:", error);
+        } else {
+          console.log("Created task:", data);
+        }
+      }
+    } catch (err) {
+      console.error("Error creating initial goals:", err);
     }
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+    } else {
+      navigate("/");
     }
   };
 
@@ -709,10 +856,22 @@ const OnboardingFlow = ({
             >
               <ChevronLeft className="h-4 w-4" /> Back
             </Button>
-            <Button onClick={handleNext} className="flex items-center gap-1">
-              {currentStep === steps.length - 1 ? "Complete" : "Next"}{" "}
-              {currentStep < steps.length - 1 && (
-                <ChevronRight className="h-4 w-4" />
+            <Button
+              onClick={handleNext}
+              className="flex items-center gap-1"
+              disabled={saving}
+            >
+              {currentStep === steps.length - 1 ? (
+                saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Complete"
+                )
+              ) : (
+                <>Next {<ChevronRight className="h-4 w-4" />}</>
               )}
             </Button>
           </CardFooter>

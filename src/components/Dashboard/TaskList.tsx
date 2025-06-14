@@ -19,7 +19,10 @@ import {
   ArrowRight,
   BarChart3,
   Loader2,
+  Brain,
+  Sparkles,
 } from "lucide-react";
+import { aiService } from "@/lib/services/aiService";
 import { useGoals } from "@/lib/contexts/GoalContext";
 import { Task as TaskType, taskService } from "@/lib/services/taskService";
 import { useAuth } from "@/lib/auth";
@@ -126,9 +129,35 @@ const TaskList: React.FC<TaskListProps> = ({ tasks: propTasks }) => {
     }
   }, [contextTasks]);
 
+  useEffect(() => {
+    if (user && tasks.length > 0) {
+      fetchAiRecommendations();
+    }
+  }, [user, tasks]);
+
+  const fetchAiRecommendations = async () => {
+    if (!user) return;
+    setAiLoading(true);
+    try {
+      const recommendations = await aiService.getTaskPriorities(user.id, tasks);
+      setAiRecommendations(recommendations);
+    } catch (error) {
+      console.error("Error fetching AI recommendations:", error);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const [impedimentTask, setImpedimentTask] = useState<TaskType | null>(null);
   const [impedimentReason, setImpedimentReason] = useState("");
   const [impedimentDialogOpen, setImpedimentDialogOpen] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [selectedTaskForAi, setSelectedTaskForAi] = useState<TaskType | null>(
+    null,
+  );
+  const [aiStrategy, setAiStrategy] = useState<any>(null);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -208,6 +237,23 @@ const TaskList: React.FC<TaskListProps> = ({ tasks: propTasks }) => {
     setImpedimentReason("");
   };
 
+  const handleGetAiStrategy = async (task: TaskType) => {
+    if (!user) return;
+
+    setSelectedTaskForAi(task);
+    setAiDialogOpen(true);
+    setAiLoading(true);
+
+    try {
+      const strategy = await aiService.getTaskStrategies(user.id, task.id);
+      setAiStrategy(strategy);
+    } catch (error) {
+      console.error("Error getting AI strategy:", error);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // Sort tasks by priority and impact score
   const sortedTasks = [...tasks].sort((a, b) => {
     const priorityOrder: Record<string, number> = {
@@ -239,6 +285,12 @@ const TaskList: React.FC<TaskListProps> = ({ tasks: propTasks }) => {
           </Badge>
         </div>
         <Progress value={completionPercentage} className="h-2 mt-2" />
+        {aiRecommendations.length > 0 && (
+          <div className="mt-2 pt-2 border-t text-xs text-muted-foreground flex items-center">
+            <Sparkles className="h-3 w-3 mr-1 text-primary" />
+            AI has prioritized your tasks based on impact and goals
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -311,6 +363,15 @@ const TaskList: React.FC<TaskListProps> = ({ tasks: propTasks }) => {
                           <AlertCircle className="h-3 w-3" />
                           Issue
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGetAiStrategy(task)}
+                          className="flex items-center gap-1"
+                        >
+                          <Brain className="h-3 w-3" />
+                          AI Strategy
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -359,6 +420,57 @@ const TaskList: React.FC<TaskListProps> = ({ tasks: propTasks }) => {
             >
               Submit
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              AI Strategy Recommendations
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            {aiLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+                <span>Generating intelligent strategy...</span>
+              </div>
+            ) : aiStrategy ? (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-lg">
+                    {selectedTaskForAi?.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedTaskForAi?.description}
+                  </p>
+                </div>
+
+                <div className="bg-muted/30 p-4 rounded-lg">
+                  <h4 className="font-medium mb-2">Strategy Recommendation</h4>
+                  <div className="whitespace-pre-wrap text-sm">
+                    {aiStrategy.content}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Reasoning</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {aiStrategy.reasoning}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No AI strategy available for this task.</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setAiDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

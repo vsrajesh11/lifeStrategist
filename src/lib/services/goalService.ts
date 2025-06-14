@@ -32,17 +32,33 @@ export const goalService = {
       return [];
     }
 
+    console.log("Fetched goals:", data);
     return data as Goal[];
   },
 
-  async createGoal(goal: Omit<Goal, "id" | "created_at" | "updated_at">) {
-    const { data, error } = await supabase.from("goals").insert(goal).select();
+  async createGoal(
+    goal: Omit<Goal, "id" | "created_at" | "updated_at">,
+  ): Promise<Goal | null> {
+    // Ensure required fields are present
+    const goalToCreate = {
+      ...goal,
+      impact_score: goal.impact || 50, // Default impact if not provided
+      progress: goal.progress || 0, // Default progress if not provided
+      type: goal.type || "medium-term", // Default type if not provided
+    };
+
+    console.log("Creating goal:", goalToCreate);
+    const { data, error } = await supabase
+      .from("goals")
+      .insert(goalToCreate)
+      .select();
 
     if (error) {
       console.error("Error creating goal:", error);
       return null;
     }
 
+    console.log("Created goal:", data[0]);
     return data[0] as Goal;
   },
 

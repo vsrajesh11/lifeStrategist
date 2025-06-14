@@ -5,6 +5,12 @@ import "./index.css";
 import { BrowserRouter } from "react-router-dom";
 
 import { TempoDevtools } from "tempo-devtools";
+import { initSecurity } from "./lib/securityMiddleware";
+
+// Initialize security features
+initSecurity();
+
+// Initialize Tempo devtools
 TempoDevtools.init();
 
 const basename = import.meta.env.BASE_URL;

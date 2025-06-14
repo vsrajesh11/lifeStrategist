@@ -11,9 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAuth } from "@/lib/auth";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Mail, Apple } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/lib/auth";
 
 const SignupForm = () => {
   const [email, setEmail] = useState("");
@@ -21,8 +21,8 @@ const SignupForm = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
   const navigate = useNavigate();
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,11 +37,96 @@ const SignupForm = () => {
 
     try {
       const { error } = await signUp(email, password);
-      if (error) throw error;
-      navigate("/onboarding");
+
+      if (error) {
+        throw error;
+      }
+
+      // Set flag that we're in the onboarding process
+      localStorage.setItem("onboardingInProgress", "true");
+
+      // Show success message
+      setError(
+        "Signup successful! Please check your email to confirm your account.",
+      );
+
+      // Navigate to onboarding after a short delay
+      setTimeout(() => {
+        navigate("/onboarding");
+      }, 2000);
     } catch (err: any) {
-      setError(err.message || "Failed to sign up");
+      let errorMessage = "Failed to create account. Please try again.";
+
+      if (
+        err.message?.includes("User already registered") ||
+        err.message?.includes("already been registered")
+      ) {
+        errorMessage = "Account already exists. Please try signing in instead.";
+      } else if (err.message?.includes("Password should be at least")) {
+        errorMessage = "Password should be at least 6 characters long.";
+      } else if (err.message?.includes("Invalid email")) {
+        errorMessage = "Please enter a valid email address.";
+      } else if (err.message?.includes("Too many requests")) {
+        errorMessage =
+          "Too many signup attempts. Please wait a moment before trying again.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      localStorage.setItem("onboardingInProgress", "true");
+      const { supabase } = await import("@/lib/supabase");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/onboarding`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      localStorage.removeItem("onboardingInProgress");
+      setError(
+        err.message || "Failed to sign up with Google. Please try again.",
+      );
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      localStorage.setItem("onboardingInProgress", "true");
+      const { supabase } = await import("@/lib/supabase");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: {
+          redirectTo: `${window.location.origin}/onboarding`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (err: any) {
+      localStorage.removeItem("onboardingInProgress");
+      setError(
+        err.message || "Failed to sign up with Apple. Please try again.",
+      );
       setLoading(false);
     }
   };
@@ -94,8 +179,42 @@ const SignupForm = () => {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Creating account..." : "Sign Up"}
+            {loading ? "Creating account..." : "Sign Up with Email"}
           </Button>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignUp}
+              disabled={loading}
+              className="flex items-center justify-center gap-2"
+            >
+              <Mail className="h-4 w-4" />
+              Google
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleAppleSignUp}
+              disabled={loading}
+              className="flex items-center justify-center gap-2"
+            >
+              <Apple className="h-4 w-4" />
+              Apple
+            </Button>
+          </div>
         </form>
       </CardContent>
       <CardFooter className="flex justify-center">

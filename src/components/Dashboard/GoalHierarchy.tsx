@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useGoals } from "@/lib/contexts/GoalContext";
+import { useAuth } from "@/lib/auth";
 import { GoalWithChildren } from "@/lib/services/goalService";
 
 interface GoalHierarchyProps {
@@ -26,12 +27,29 @@ interface GoalHierarchyProps {
 }
 
 const GoalHierarchy = ({ goals: propGoals }: GoalHierarchyProps) => {
-  const { goals: contextGoals, loading, error } = useGoals();
+  const { goals: contextGoals, loading, error, refreshData } = useGoals();
   const goals = propGoals || contextGoals || defaultGoals;
 
+  // Initialize expanded state for goals that exist
   const [expandedGoals, setExpandedGoals] = useState<Record<string, boolean>>(
-    goals.reduce((acc, goal) => ({ ...acc, [goal.id]: true }), {}),
+    {},
   );
+
+  // Update expanded goals when goals change
+  useEffect(() => {
+    if (goals && goals.length > 0) {
+      setExpandedGoals(
+        goals.reduce((acc, goal) => ({ ...acc, [goal.id]: true }), {}),
+      );
+    }
+  }, [goals]);
+
+  // Refresh data on component mount
+  useEffect(() => {
+    if (refreshData) {
+      refreshData();
+    }
+  }, [refreshData]);
 
   const toggleExpand = (goalId: string) => {
     setExpandedGoals((prev) => ({
@@ -148,11 +166,74 @@ const GoalHierarchy = ({ goals: propGoals }: GoalHierarchyProps) => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Goal Hierarchy</h2>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const allExpanded = Object.values(expandedGoals).every((v) => v);
+              const newState = goals.reduce(
+                (acc, goal) => ({ ...acc, [goal.id]: !allExpanded }),
+                {},
+              );
+              setExpandedGoals(newState);
+            }}
+          >
             <ChevronDown className="mr-2 h-4 w-4" />
-            Expand All
+            {Object.values(expandedGoals).every((v) => v)
+              ? "Collapse All"
+              : "Expand All"}
           </Button>
-          <Button variant="default" size="sm">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => {
+              const title = prompt("Enter goal title:");
+              if (!title) return;
+
+              const description =
+                prompt("Enter goal description (optional):") || "";
+              const priorityOptions = ["high", "medium", "low"];
+              const priority =
+                prompt(`Enter priority (${priorityOptions.join(", ")}):`) ||
+                "medium";
+              const typeOptions = ["lifetime", "medium-term", "daily"];
+              const type =
+                prompt(`Enter goal type (${typeOptions.join(", ")}):`) ||
+                "medium-term";
+
+              // Use imported goalService instead of requiring it
+              // And get user from the current context
+              // Get user from context
+              const { user } = useAuth();
+
+              if (user) {
+                // Import goalService directly
+                import("@/lib/services/goalService").then(({ goalService }) => {
+                  goalService
+                    .createGoal({
+                      title,
+                      description,
+                      priority: priorityOptions.includes(priority)
+                        ? priority
+                        : "medium",
+                      progress: 0,
+                      impact: 50,
+                      type: typeOptions.includes(type) ? type : "medium-term",
+                      user_id: user.id,
+                    })
+                    .then(() => {
+                      if (refreshData) {
+                        refreshData();
+                      }
+                    })
+                    .catch((error) => {
+                      console.error("Error creating goal:", error);
+                      alert("Failed to create goal. Please try again.");
+                    });
+                });
+              }
+            }}
+          >
             <Star className="mr-2 h-4 w-4" />
             Add Goal
           </Button>

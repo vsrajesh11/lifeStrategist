@@ -46,13 +46,18 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
+      console.log("Fetching data for user:", user.id);
+
       // Fetch goals
       const goalsData = await goalService.getGoals(user.id);
+      console.log("Goals data fetched:", goalsData);
       const hierarchicalGoals = goalService.organizeGoalHierarchy(goalsData);
+      console.log("Hierarchical goals:", hierarchicalGoals);
       setGoals(hierarchicalGoals);
 
       // Fetch tasks
       const tasksData = await taskService.getTasks(user.id);
+      console.log("Tasks data fetched:", tasksData);
       setTasks(tasksData);
 
       // Calculate completion rate
