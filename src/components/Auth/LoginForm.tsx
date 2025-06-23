@@ -31,13 +31,37 @@ const LoginForm = () => {
     setLoading(true);
 
     try {
-      const { error } = await signIn(email, password);
-
-      if (error) {
-        throw error;
+      if (!email || !password) {
+        setError("Please enter both email and password");
+        return;
       }
 
-      // Check if user was trying to complete onboarding
+      const { data, error } = await signIn(email, password);
+
+      if (error) {
+        let errorMessage = "Failed to login. Please try again.";
+
+        if (error.message?.includes("Invalid login credentials")) {
+          errorMessage =
+            "Invalid email or password. Please check your credentials and try again.";
+        } else if (error.message?.includes("Email not confirmed")) {
+          errorMessage =
+            "Please check your email and click the confirmation link before signing in.";
+        } else if (error.message?.includes("Too many requests")) {
+          errorMessage =
+            "Too many login attempts. Please wait a moment before trying again.";
+        } else if (error.message?.includes("fetch")) {
+          errorMessage =
+            "Connection error. Please check your internet connection and try again.";
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        setError(errorMessage);
+        return;
+      }
+
+      // Success - check if user was trying to complete onboarding
       const onboardingInProgress = localStorage.getItem("onboardingInProgress");
       if (onboardingInProgress) {
         navigate("/onboarding");
@@ -45,22 +69,8 @@ const LoginForm = () => {
         navigate("/dashboard");
       }
     } catch (err: any) {
-      let errorMessage = "Failed to login. Please try again.";
-
-      if (err.message?.includes("Invalid login credentials")) {
-        errorMessage =
-          "Invalid email or password. Please check your credentials and try again.";
-      } else if (err.message?.includes("Email not confirmed")) {
-        errorMessage =
-          "Please check your email and click the confirmation link before signing in.";
-      } else if (err.message?.includes("Too many requests")) {
-        errorMessage =
-          "Too many login attempts. Please wait a moment before trying again.";
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      console.error("Unexpected error during login:", err);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +83,7 @@ const LoginForm = () => {
 
     try {
       const { supabase } = await import("@/lib/supabase");
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/dashboard`,
@@ -83,8 +93,12 @@ const LoginForm = () => {
       if (error) {
         throw error;
       }
+
+      // OAuth will redirect, so we don't need to handle success here
     } catch (err: any) {
+      console.error("Google sign in error:", err);
       setError(err.message || "Failed to login with Google. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -96,7 +110,7 @@ const LoginForm = () => {
 
     try {
       const { supabase } = await import("@/lib/supabase");
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: {
           redirectTo: `${window.location.origin}/dashboard`,
@@ -106,8 +120,12 @@ const LoginForm = () => {
       if (error) {
         throw error;
       }
+
+      // OAuth will redirect, so we don't need to handle success here
     } catch (err: any) {
+      console.error("Apple sign in error:", err);
       setError(err.message || "Failed to login with Apple. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -164,6 +182,7 @@ const LoginForm = () => {
 
                     try {
                       const { supabase } = await import("@/lib/supabase");
+
                       const { error: resetError } =
                         await supabase.auth.resetPasswordForEmail(
                           emailToReset,
@@ -190,6 +209,9 @@ const LoginForm = () => {
                       } else if (err.message?.includes("rate limit")) {
                         errorMessage =
                           "For security purposes, we can only send password reset emails every 60 seconds. Please wait before trying again.";
+                      } else if (err.message?.includes("fetch")) {
+                        errorMessage =
+                          "Connection error. Please check your internet connection and try again.";
                       } else if (err.message) {
                         errorMessage = err.message;
                       }

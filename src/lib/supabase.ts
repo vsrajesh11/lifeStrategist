@@ -4,25 +4,18 @@ import type { Database } from "@/types/supabase";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
-// Simple validation
+// Simplified validation
 function validateSupabaseConfig() {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("❌ Missing Supabase environment variables");
     return false;
   }
-
-  try {
-    new URL(supabaseUrl);
-    return true;
-  } catch (error) {
-    console.error("❌ Invalid Supabase URL:", supabaseUrl);
-    return false;
-  }
+  return true;
 }
 
 const isConfigValid = validateSupabaseConfig();
 
-// Create a simple, reliable client
+// Create client with minimal, stable configuration
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,

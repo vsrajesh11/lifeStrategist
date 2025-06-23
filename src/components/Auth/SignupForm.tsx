@@ -28,18 +28,51 @@ const SignupForm = () => {
     e.preventDefault();
     setError(null);
 
+    if (!email || !password || !confirmPassword) {
+      setError("Please fill in all fields");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long");
       return;
     }
 
     setLoading(true);
 
     try {
-      const { error } = await signUp(email, password);
+      const { data, error } = await signUp(email, password);
 
       if (error) {
-        throw error;
+        let errorMessage = "Failed to create account. Please try again.";
+
+        if (
+          error.message?.includes("User already registered") ||
+          error.message?.includes("already been registered")
+        ) {
+          errorMessage =
+            "Account already exists. Please try signing in instead.";
+        } else if (error.message?.includes("Password should be at least")) {
+          errorMessage = "Password should be at least 6 characters long.";
+        } else if (error.message?.includes("Invalid email")) {
+          errorMessage = "Please enter a valid email address.";
+        } else if (error.message?.includes("Too many requests")) {
+          errorMessage =
+            "Too many signup attempts. Please wait a moment before trying again.";
+        } else if (error.message?.includes("fetch")) {
+          errorMessage =
+            "Connection error. Please check your internet connection and try again.";
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        setError(errorMessage);
+        return;
       }
 
       // Set flag that we're in the onboarding process
@@ -55,25 +88,8 @@ const SignupForm = () => {
         navigate("/onboarding");
       }, 2000);
     } catch (err: any) {
-      let errorMessage = "Failed to create account. Please try again.";
-
-      if (
-        err.message?.includes("User already registered") ||
-        err.message?.includes("already been registered")
-      ) {
-        errorMessage = "Account already exists. Please try signing in instead.";
-      } else if (err.message?.includes("Password should be at least")) {
-        errorMessage = "Password should be at least 6 characters long.";
-      } else if (err.message?.includes("Invalid email")) {
-        errorMessage = "Please enter a valid email address.";
-      } else if (err.message?.includes("Too many requests")) {
-        errorMessage =
-          "Too many signup attempts. Please wait a moment before trying again.";
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      console.error("Unexpected error during signup:", err);
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -86,7 +102,7 @@ const SignupForm = () => {
     try {
       localStorage.setItem("onboardingInProgress", "true");
       const { supabase } = await import("@/lib/supabase");
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/onboarding`,
@@ -96,11 +112,15 @@ const SignupForm = () => {
       if (error) {
         throw error;
       }
+
+      // OAuth will redirect, so we don't need to handle success here
     } catch (err: any) {
+      console.error("Google sign up error:", err);
       localStorage.removeItem("onboardingInProgress");
       setError(
         err.message || "Failed to sign up with Google. Please try again.",
       );
+    } finally {
       setLoading(false);
     }
   };
@@ -112,7 +132,7 @@ const SignupForm = () => {
     try {
       localStorage.setItem("onboardingInProgress", "true");
       const { supabase } = await import("@/lib/supabase");
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: {
           redirectTo: `${window.location.origin}/onboarding`,
@@ -122,11 +142,15 @@ const SignupForm = () => {
       if (error) {
         throw error;
       }
+
+      // OAuth will redirect, so we don't need to handle success here
     } catch (err: any) {
+      console.error("Apple sign up error:", err);
       localStorage.removeItem("onboardingInProgress");
       setError(
         err.message || "Failed to sign up with Apple. Please try again.",
       );
+    } finally {
       setLoading(false);
     }
   };

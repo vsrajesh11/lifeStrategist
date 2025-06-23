@@ -19,42 +19,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Clear any stale auth data on component mount
-    localStorage.removeItem("supabase.auth.token");
+    let mounted = true;
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    const getInitialSession = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
-      // Store auth state in localStorage for easy checking
-      if (session) {
-        localStorage.setItem("supabase.auth.token", "true");
-      } else {
-        localStorage.removeItem("supabase.auth.token");
+        if (error) {
+          console.error("Error getting session:", error);
+        }
+
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+
+          // Store auth state in localStorage for easy checking
+          if (session) {
+            localStorage.setItem("supabase.auth.token", "true");
+          } else {
+            localStorage.removeItem("supabase.auth.token");
+          }
+        }
+      } catch (error) {
+        console.error("Error in getInitialSession:", error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    });
+    };
+
+    getInitialSession();
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      // Force clear any previous state to avoid stale data
-      if (!session) {
-        setSession(null);
-        setUser(null);
-        localStorage.removeItem("supabase.auth.token");
-        localStorage.removeItem("onboardingInProgress");
-      } else {
-        setSession(session);
-        setUser(session?.user ?? null);
-        localStorage.setItem("supabase.auth.token", "true");
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("Auth state changed:", event, session?.user?.email);
+
+      if (mounted) {
+        if (!session) {
+          setSession(null);
+          setUser(null);
+          localStorage.removeItem("supabase.auth.token");
+          localStorage.removeItem("onboardingInProgress");
+        } else {
+          setSession(session);
+          setUser(session?.user ?? null);
+          localStorage.setItem("supabase.auth.token", "true");
+        }
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -64,46 +87,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     signIn: async (email: string, password: string) => {
       try {
-        console.log("🔐 Attempting sign in for:", email);
-        const result = await supabase.auth.signInWithPassword({
-          email,
+        if (!email || !password) {
+          throw new Error("Email and password are required");
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
           password,
         });
-        console.log("✅ Sign in result:", result.error ? "Error" : "Success");
-        return result;
+
+        if (error) {
+          throw error;
+        }
+
+        return { data, error: null };
       } catch (error: any) {
-        console.error("❌ Sign in error:", error);
-        throw new Error(
-          error.message ||
-            "Failed to sign in. Please check your connection and try again.",
-        );
+        console.error("Sign in error:", error);
+        return { data: null, error };
       }
     },
     signUp: async (email: string, password: string) => {
       try {
-        console.log("📝 Attempting sign up for:", email);
-        const result = await supabase.auth.signUp({ email, password });
-        console.log("✅ Sign up result:", result.error ? "Error" : "Success");
-        return result;
+        if (!email || !password) {
+          throw new Error("Email and password are required");
+        }
+
+        if (password.length < 6) {
+          throw new Error("Password must be at least 6 characters long");
+        }
+
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        return { data, error: null };
       } catch (error: any) {
-        console.error("❌ Sign up error:", error);
-        throw new Error(
-          error.message ||
-            "Failed to create account. Please check your connection and try again.",
-        );
+        console.error("Sign up error:", error);
+        return { data: null, error };
       }
     },
     signOut: async () => {
       try {
-        console.log("🚪 Attempting sign out");
-        const result = await supabase.auth.signOut();
-        console.log("✅ Sign out result:", result.error ? "Error" : "Success");
-        return result;
+        const { error } = await supabase.auth.signOut();
+
+        if (error) {
+          throw error;
+        }
+
+        // Clear local storage
+        localStorage.removeItem("supabase.auth.token");
+        localStorage.removeItem("onboardingInProgress");
+        localStorage.removeItem("hasCompletedOnboarding");
+
+        return { error: null };
       } catch (error: any) {
-        console.error("❌ Sign out error:", error);
-        throw new Error(
-          error.message || "Failed to sign out. Please try again.",
-        );
+        console.error("Sign out error:", error);
+        return { error };
       }
     },
     loading,
